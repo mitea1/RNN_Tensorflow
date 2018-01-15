@@ -2,18 +2,18 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 
-
-three_series = [number * 3 for number in range(1, 11)]
-
-three_series_to_index = {num:i for i,num in enumerate(three_series)}
-index_to_three_series = {i:num for i,num in enumerate(three_series)}
-
 # RNN Parameters
-element_size = 10
+element_size = 20
 time_steps = 3
-num_classes = 10
+num_classes = 20
 batch_size = 3
 hidden_layer_size = 128
+
+
+three_series = [number * 3 for number in range(1, element_size+1)]
+
+three_series_to_index = {num: i for i, num in enumerate(three_series)}
+index_to_three_series = {i: num for i, num in enumerate(three_series)}
 
 # Input & Output of NN
 _inputs = tf.placeholder(tf.float32, shape=[None, time_steps, element_size], name='inputs')
@@ -32,11 +32,19 @@ def get_linear_layer(linear_input_vector):
     return tf.matmul(linear_input_vector, Weights_linear) + biases_linear
 
 def get_batch(batch_size):
-    batch_x = np.zeros((3, num_classes))
-    batch_y = np.zeros((1, num_classes))
-    for i in range(0, 3):
-        batch_x[i][i] = 1
-    batch_y[0][i+1] = 1
+    batch_x = np.zeros((batch_size, time_steps, num_classes))
+    batch_y = np.zeros((batch_size, num_classes))
+    for i in range(0, batch_size):
+        start_series = np.random.random_integers(num_classes - time_steps - 1)
+        time_step = 0
+        for j in range(start_series,start_series+time_steps):
+            series_number = index_to_three_series[j]
+            batch_x[i][time_step][three_series_to_index[series_number]] = 1
+            time_step += 1
+        target_number = index_to_three_series[j+1]
+        batch_y[i][three_series_to_index[target_number]] = 1
+
+
 
     return batch_x, batch_y
 
@@ -60,12 +68,12 @@ accuracy = (tf.reduce_mean(tf.cast(correct_prediction, tf.float32))) * 100
 sess = tf.InteractiveSession()
 sess.run(tf.global_variables_initializer())
 
-for i in range(1001):
+for i in range(5000):
 
     batch_x, batch_y = get_batch(batch_size)
-    batch_x = batch_x.reshape((1, time_steps, element_size))
+    batch_x = batch_x.reshape((batch_size, time_steps, element_size))
     sess.run(train_step, feed_dict={_inputs: batch_x, y: batch_y})
-    if i % 20 == 0:
+    if i % 100 == 0:
         acc = sess.run(accuracy, feed_dict={_inputs: batch_x, y: batch_y})
         loss = sess.run(cross_entropy, feed_dict={_inputs: batch_x, y: batch_y})
         print("Iter " + str(i) + ", Minibatch Loss= " + "{:.6f}".format(loss) + ", Training Accuracy= " + "{:.5f}".format(acc))
