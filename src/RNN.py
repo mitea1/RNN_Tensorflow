@@ -1,80 +1,108 @@
+from __future__ import print_function
+
+import numpy
 import tensorflow as tf
-import numpy as np
+from tensorflow.contrib import rnn
+
+# Import MNIST data
 from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets("/tmp/data/", one_hot=True)
 
-# RNN Parameters
-element_size = 20
-time_steps = 3
-num_classes = 20
-batch_size = 3
-hidden_layer_size = 128
+'''
+To classify images using a recurrent neural network, we consider every image
+row as a sequence of pixels. Because MNIST image shape is 28*28px, we will then
+handle 28 sequences of 28 steps for every sample.
+'''
 
+# Training Parameters
+learning_rate = 0.001
+training_steps = 10000
+batch_size = 128
+display_step = 200
 
-three_series = [number * 3 for number in range(1, element_size+1)]
+# Network Parameters
+num_input = 28 # MNIST data input (img shape: 28*28)
+timesteps = 28 # timesteps
+num_hidden = 128 # hidden layer num of features
+num_classes = 10 # MNIST total classes (0-9 digits)
 
-three_series_to_index = {num: i for i, num in enumerate(three_series)}
-index_to_three_series = {i: num for i, num in enumerate(three_series)}
+# tf Graph input
+X = tf.placeholder("float", [None, timesteps, num_input])
+Y = tf.placeholder("float", [None, num_classes])
 
-# Input & Output of NN
-_inputs = tf.placeholder(tf.float32, shape=[None, time_steps, element_size], name='inputs')
-y = tf.placeholder(tf.float32, shape=[None, num_classes], name='inputs')
-
-# TensorFlow built-in functions
-rnn_cell = tf.contrib.rnn.BasicRNNCell(hidden_layer_size)
-outputs, _ = tf.nn.dynamic_rnn(rnn_cell, _inputs, dtype=tf.float32)
-
-# Weights and biases
-Weights_linear = tf.Variable(tf.truncated_normal([hidden_layer_size, num_classes], mean=0, stddev=.01))
-biases_linear = tf.Variable(tf.truncated_normal([num_classes], mean=0, stddev=.01))
-
-
-def get_linear_layer(linear_input_vector):
-    return tf.matmul(linear_input_vector, Weights_linear) + biases_linear
-
-def get_batch(batch_size):
-    batch_x = np.zeros((batch_size, time_steps, num_classes))
-    batch_y = np.zeros((batch_size, num_classes))
-    for i in range(0, batch_size):
-        start_series = np.random.random_integers(num_classes - time_steps - 1)
-        time_step = 0
-        for j in range(start_series,start_series+time_steps):
-            series_number = index_to_three_series[j]
-            batch_x[i][time_step][three_series_to_index[series_number]] = 1
-            time_step += 1
-        target_number = index_to_three_series[j+1]
-        batch_y[i][three_series_to_index[target_number]] = 1
+# Define weights and biases
+weights = {
+    'out': tf.Variable(tf.random_normal([num_hidden, num_classes]))
+}
+biases = {
+    'out': tf.Variable(tf.random_normal([num_classes]))
+}
 
 
+def RNN(x, weights, biases):
 
-    return batch_x, batch_y
+    # Prepare data shape to match `rnn` function requirements
+    # Current data input shape: (batch_size, timesteps, n_input)
+    # Required shape: 'timesteps' tensors list of shape (batch_size, n_input)
 
-last_rnn_output = outputs[:, -1, :]
-final_output = get_linear_layer(last_rnn_output)
+    # Unstack to get a list of 'timesteps' tensors of shape (batch_size, n_input)
+    x = tf.unstack(x, timesteps, 1)
 
-softmax = tf.nn.softmax_cross_entropy_with_logits(logits=final_output, labels=y)
-cross_entropy = tf.reduce_mean(softmax)
-train_step = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cross_entropy)
+    # Define a lstm cell with tensorflow
+    #lstm_cell = rnn.BasicLSTMCell(num_hidden, forget_bias=1.0)
+    rnn_cell = rnn.BasicRNNCell(num_hidden)
 
-# Check if prediction is correct
-correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(final_output, 1))
-# Calculate accuracy
-accuracy = (tf.reduce_mean(tf.cast(correct_prediction, tf.float32))) * 100
+    # Get lstm cell output
+    outputs, states = rnn.static_rnn(rnn_cell, x, dtype=tf.float32)
+
+    # Linear activation, using rnn inner loop last output
+    return tf.matmul(outputs[-1], weights['out']) + biases['out']
+
+logits = RNN(X, weights, biases)
+prediction = tf.nn.softmax(logits)
+
+# Define loss and optimizer
+loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y))
+optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+train_op = optimizer.minimize(loss_op)
+
+# Evaluate model (with test logits, for dropout to be disabled)
+correct_pred = tf.equal(tf.argmax(prediction, 1), tf.argmax(Y, 1))
+accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
+# Initialize the variables (i.e. assign their default value)
+init = tf.global_variables_initializer()
+
+# Start training
+with tf.Session() as sess:
+
+    # Run the initializer
+    sess.run(init)
+
+    for step in range(1, training_steps+1):
+        batch_x, batch_y = mnist.train.next_batch(batch_size)
+        # Reshape data to get 28 seq of 28 elements
+        batch_x = batch_x.reshape((batch_size, timesteps, num_input))
+        # Run optimization op (backprop)
+        sess.run(train_op, feed_dict={X: batch_x, Y: batch_y})
+        if step % display_step == 0 or step == 1:
+            # Calculate batch loss and accuracy
+            loss, acc = sess.run([loss_op, accuracy], feed_dict={X: batch_x,Y: batch_y})
+            print("Step " + str(step) + ", Minibatch Loss= " + \
+                  "{:.4f}".format(loss) + ", Training Accuracy= " + \
+                  "{:.3f}".format(acc))
+            x = numpy.array(batch_x[-1, :, :]).reshape(1, 28, 28)
+            y = numpy.array(batch_y[-1, :]).reshape(1, 10)
+            pred = sess.run([prediction], feed_dict={X: x})
+            print(pred)
+            print(y)
 
 
-# Cut test image into slices
-#test_data = mnist.test.images[:batch_size].reshape((-1,time_steps,element_size))
-#test_label = mnist.test.labels[:batch_size]
+    print("Optimization Finished!")
 
-sess = tf.InteractiveSession()
-sess.run(tf.global_variables_initializer())
-
-for i in range(5000):
-
-    batch_x, batch_y = get_batch(batch_size)
-    batch_x = batch_x.reshape((batch_size, time_steps, element_size))
-    sess.run(train_step, feed_dict={_inputs: batch_x, y: batch_y})
-    if i % 100 == 0:
-        acc = sess.run(accuracy, feed_dict={_inputs: batch_x, y: batch_y})
-        loss = sess.run(cross_entropy, feed_dict={_inputs: batch_x, y: batch_y})
-        print("Iter " + str(i) + ", Minibatch Loss= " + "{:.6f}".format(loss) + ", Training Accuracy= " + "{:.5f}".format(acc))
-        #print("Testing Accuracy:",sess.run(accuracy, feed_dict={_inputs: test_data, y: test_label}))
+    # Calculate accuracy for 128 mnist test images
+    test_len = 128
+    test_data = mnist.test.images[:test_len].reshape((-1, timesteps, num_input))
+    test_label = mnist.test.labels[:test_len]
+    print("Testing Accuracy:", \
+        sess.run(accuracy, feed_dict={X: test_data, Y: test_label}))
