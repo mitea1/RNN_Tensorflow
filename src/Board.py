@@ -1,21 +1,26 @@
 import numpy as np
 
-NUM_ROWS = 7
-NUM_COLUMNS = 6
-X_OCCUPIED_CELL = [1, 0, 0]
-O_OCCUPIED_CELL = [0, 1, 0]
-EMPTY_CELL = [0, 0, 1]
-
-
 class Board:
+    NUM_ROWS = 7
+    NUM_COLUMNS = 6
+    X_OCCUPIED_CELL = [1, 0, 0]
+    O_OCCUPIED_CELL = [0, 1, 0]
+    EMPTY_CELL = [0, 0, 1]
+    CHAR_EMPTY = '_'
+    CHAR_PLAYER_A = 'x'
+    CHAR_PLAYER_B = 'o'
 
-    def __init__(self, num_rows=NUM_ROWS,num_columns=NUM_COLUMNS):
+    def __init__(self, num_rows=NUM_ROWS, num_columns=NUM_COLUMNS):
         self.rows = num_rows
         self.columns = num_columns
         self.board_matrix = np.zeros((self.rows, self.columns, 3))
-        self.char_to_state_vector = {'x': X_OCCUPIED_CELL, 'o': O_OCCUPIED_CELL, '_': EMPTY_CELL}
+        self.char_to_state_vector = {self.CHAR_PLAYER_A: self.X_OCCUPIED_CELL, self.CHAR_PLAYER_B: self.O_OCCUPIED_CELL, self.CHAR_EMPTY: self.EMPTY_CELL}
         self.board_char_representation = np.chararray((self.rows, self.columns), itemsize=1, unicode=1)
-        self.board_char_representation[:] = '_'
+        self.board_char_representation[:] = self.CHAR_EMPTY
+
+    def clear(self):
+        self.board_matrix = np.zeros((self.rows, self.columns, 3))
+        self.board_char_representation[:] = self.CHAR_EMPTY
 
     # Gets the latest char representation matrix from the board
     def convert_to_char_representation(self):
@@ -24,11 +29,11 @@ class Board:
             for j in range(0, columns):
                 entry = self.board_matrix[i,j]
                 if entry[0] == 1:
-                    self.board_char_representation[i, j] = 'x'
+                    self.board_char_representation[i, j] = self.CHAR_PLAYER_A
                 elif entry[1] == 1:
-                    self.board_char_representation[i, j] = 'o'
+                    self.board_char_representation[i, j] = self.CHAR_PLAYER_B
                 elif entry[2] == 1:
-                    self.board_char_representation[i, j] = '_'
+                    self.board_char_representation[i, j] = self.CHAR_EMPTY
 
     # prints out the latest char representation of the board
     def print_char_representation(self):
@@ -47,13 +52,15 @@ class Board:
         for row in range(0, self.rows):
             for column in range(0, self.columns):
                 actual_char = self.board_char_representation[row, column]
-                if actual_char == 'x' or actual_char == 'o':
+                if actual_char == self.CHAR_PLAYER_A or actual_char == self.CHAR_PLAYER_B:
                     checking_next_column_char = True
-                    checking_next_diagonal_char = True
+                    checking_next_diagdown_char = True
+                    checking_next_diagup_char = True
                     checking_next_row_char = True
+
                     offset = 1
                     while(checking_next_column_char):
-                        if (column + offset) >= (self.columns - 1):
+                        if (column + offset) > (self.columns - 1):
                             checking_next_column_char = False
                         else:
                             next_column_char = self.board_char_representation[row, column + offset]
@@ -62,24 +69,37 @@ class Board:
                             else:
                                 checking_next_column_char = False
                             if offset == 4:
-                                return True
+                                return True, actual_char
 
                     offset = 1
-                    while (checking_next_diagonal_char):
-                        if (column + offset >= self.columns - 1) or (row + offset >= self.rows - 1):
-                            checking_next_diagonal_char = False
+                    while (checking_next_diagdown_char):
+                        if (column + offset > self.columns - 1) or (row + offset > self.rows - 1):
+                            checking_next_diagdown_char = False
                         else:
                             next_diagonal_char = self.board_char_representation[row + offset, column + offset]
                             if next_diagonal_char == actual_char:
                                 offset += 1
                             else:
-                                checking_next_diagonal_char = False
+                                checking_next_diagdown_char = False
                             if offset == 4:
-                                return True
+                                return True, actual_char
+
+                    offset = 1
+                    while (checking_next_diagup_char):
+                        if (column + offset > self.columns - 1) or (row - offset < 0):
+                            checking_next_diagup_char = False
+                        else:
+                            next_diagonal_char = self.board_char_representation[row - offset, column + offset]
+                            if next_diagonal_char == actual_char:
+                                offset += 1
+                            else:
+                                checking_next_diagup_char = False
+                            if offset == 4:
+                                return True, actual_char
 
                     offset = 1
                     while (checking_next_row_char):
-                        if row + offset >= self.rows - 1:
+                        if row + offset > self.rows - 1:
                             checking_next_row_char = False
                         else:
                             next_row_char = self.board_char_representation[row+offset, column]
@@ -88,34 +108,5 @@ class Board:
                             else:
                                 checking_next_row_char = False
                             if offset == 4:
-                                return True
-                            if row + offset >= self.rows - 1:
-                                checking_next_row_char = False
-
-
-        return False
-
-
-
-
-
-b = Board()
-b.print_char_representation()
-b.set_cell_state(1, 1, X_OCCUPIED_CELL)
-b.set_cell_state(3, 2, O_OCCUPIED_CELL)
-
-b.set_cell_state(4, 2, O_OCCUPIED_CELL)
-b.set_cell_state(6, 1, O_OCCUPIED_CELL)
-b.set_cell_state(6, 2, O_OCCUPIED_CELL)
-#b.set_cell_state(6, 3, O_OCCUPIED_CELL)
-b.set_cell_state(6, 4, O_OCCUPIED_CELL)
-b.set_cell_state(6, 5, O_OCCUPIED_CELL)
-
-
-#b.set_cell_state(6, 2, O_OCCUPIED_CELL)
-
-b.print_char_representation()
-b.are_4_connected()
-
-isConnceted = b.are_4_connected()
-print(isConnceted)
+                                return True, actual_char
+        return False, None
