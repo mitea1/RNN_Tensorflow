@@ -3,9 +3,9 @@ import numpy as np
 class Board:
     NUM_ROWS = 7
     NUM_COLUMNS = 6
-    X_OCCUPIED_CELL = [1, 0, 0]
-    O_OCCUPIED_CELL = [0, 1, 0]
-    EMPTY_CELL = [0, 0, 1]
+    X_OCCUPIED_CELL = [1, 0]
+    O_OCCUPIED_CELL = [0, 1]
+    EMPTY_CELL = [0, 0]
     CHAR_EMPTY = '_'
     CHAR_PLAYER_A = 'x'
     CHAR_PLAYER_B = 'o'
@@ -13,13 +13,13 @@ class Board:
     def __init__(self, num_rows=NUM_ROWS, num_columns=NUM_COLUMNS):
         self.rows = num_rows
         self.columns = num_columns
-        self.board_matrix = np.zeros((self.rows, self.columns, 3))
+        self.board_matrix = np.zeros((self.rows, self.columns, len(self.EMPTY_CELL)))
         self.char_to_state_vector = {self.CHAR_PLAYER_A: self.X_OCCUPIED_CELL, self.CHAR_PLAYER_B: self.O_OCCUPIED_CELL, self.CHAR_EMPTY: self.EMPTY_CELL}
         self.board_char_representation = np.chararray((self.rows, self.columns), itemsize=1, unicode=1)
         self.board_char_representation[:] = self.CHAR_EMPTY
 
     def clear(self):
-        self.board_matrix = np.zeros((self.rows, self.columns, 3))
+        self.board_matrix = np.zeros((self.rows, self.columns, len(self.EMPTY_CELL)))
         self.board_char_representation[:] = self.CHAR_EMPTY
 
     # Gets the latest char representation matrix from the board
@@ -32,7 +32,7 @@ class Board:
                     self.board_char_representation[i, j] = self.CHAR_PLAYER_A
                 elif entry[1] == 1:
                     self.board_char_representation[i, j] = self.CHAR_PLAYER_B
-                elif entry[2] == 1:
+                else:
                     self.board_char_representation[i, j] = self.CHAR_EMPTY
 
     # prints out the latest char representation of the board

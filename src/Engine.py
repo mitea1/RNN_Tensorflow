@@ -1,58 +1,54 @@
-import random
+from enum import Enum
 
 from src.Board import Board
 
 
+class GameState(Enum):
+    OFFLINE = -1
+    RUNNING = 0
+    TRY_TO_SET = 1
+    SET_SUCCESSFUL = 2
+    WON_BY_PLAYER_1 = 3
+    WON_BY_PLAYER_2 = 4
+    REMIS = 5
+
 class Engine:
+
+
 
     def __init__(self):
         self.board = Board()
+        self.state = GameState.OFFLINE
 
     def step(self, player_char, column):
-        step_success = False
-        game_is_running = True
+        game_state = GameState.TRY_TO_SET
+        # Try to set
         for i in range(0, Board.NUM_ROWS):
             row = Board.NUM_ROWS - 1 - i
+            # Find empty cells
             if self.board.board_char_representation[row][column] == Board.CHAR_EMPTY:
+                # Set sells according to player
                 if player_char == Board.CHAR_PLAYER_A:
                     self.board.set_cell_state(row, column, Board.X_OCCUPIED_CELL)
-                    step_success = True
+                    game_state = GameState.SET_SUCCESSFUL
                     break
                 elif player_char == Board.CHAR_PLAYER_B:
                     self.board.set_cell_state(row, column, Board.O_OCCUPIED_CELL)
-                    step_success = True
+                    game_state = GameState.SET_SUCCESSFUL
                     break
         self.board.convert_to_char_representation()
-        self.board.print_char_representation()
-        are_4_connected, char = self.board.are_4_connected()
-        if(are_4_connected):
-            print("4 connected by "+ char)
-            game_is_running = False
-        return step_success, game_is_running
+        are_4_connected, connected_char = self.board.are_4_connected()
+        free_cells = (self.board.board_char_representation == '_').sum()
+        # Somebody won find out who
+        if are_4_connected:
+            if connected_char == Board.CHAR_PLAYER_A:
+                game_state = GameState.WON_BY_PLAYER_1
+            elif connected_char == Board.CHAR_PLAYER_B:
+                game_state = GameState.WON_BY_PLAYER_2
+        # No free cells but nobody won
+        if free_cells == 0:
+            game_state = GameState.REMIS
+        return game_state
 
     def get_board(self):
         return self.board
-
-
-eng = Engine()
-player_char = [Board.CHAR_PLAYER_A, Board.CHAR_PLAYER_B]
-number_of_Games = 10
-game_is_over = False
-
-print(eng.get_board().NUM_COLUMNS)
-
-while number_of_Games > 0:
-    is_running = True
-    i = 0
-    while is_running:
-        char = player_char[i%2]
-        step_was_successful = False
-        while not step_was_successful:
-            column = random.randint(0, Board.NUM_COLUMNS-1)
-            step_was_successful, is_running = eng.step(char, column)
-        i += 1
-    print(eng.get_board().NUM_COLUMNS)
-    eng.get_board().clear()
-    number_of_Games -= 1
-
-print(eng.get_board().board_matrix)
