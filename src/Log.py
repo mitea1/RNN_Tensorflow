@@ -22,6 +22,17 @@ class Log:
         else:
             return None
 
+    def get_states(self, start_index, end_index):
+        if end_index < self.length:
+            return self.state_matrices[start_index:end_index]
+
+    def get_next_steps(self, start_index, end_index):
+        next_steps = []
+        num_elements = end_index-start_index
+        for i in range(0, num_elements):
+            next_steps.append(self.state_matrices[start_index + 1 + i] - self.state_matrices[start_index + i])
+        return next_steps
+
     # get all states except for the last
     def get_all_states(self):
         return np.array(self.state_matrices[0:-1])
@@ -34,4 +45,7 @@ class Log:
             return None
     # get all corresponding next steps to the steps get_all_states returns
     def get_all_next_steps(self):
-        return np.array(self.state_matrices[1:])
+        next_steps = []
+        for i in range(0, self.length-1):
+            next_steps.append(self.state_matrices[i+1] - self.state_matrices[i])
+        return np.array(next_steps)
