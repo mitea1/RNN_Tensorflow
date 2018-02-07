@@ -1,4 +1,9 @@
+import numpy
 import numpy as np
+
+from src.Board import Board
+
+
 class Log:
 
     def __init__(self):
@@ -15,6 +20,9 @@ class Log:
     def add_winner(self,winner_char):
         self.winner_char = winner_char
 
+    def get_winner(self):
+        return self.winner_char
+
     # get a specific state
     def get_state(self, index):
         if index < self.length:
@@ -30,7 +38,12 @@ class Log:
         next_steps = []
         num_elements = end_index-start_index
         for i in range(0, num_elements):
-            next_steps.append(self.state_matrices[start_index + 1 + i] - self.state_matrices[start_index + i])
+            delta_state = self.state_matrices[start_index + 1 + i] - self.state_matrices[start_index + i]
+            max_index = numpy.argmax(delta_state)
+            column = max_index % Board.NUM_COLUMNS
+            next_step = numpy.zeros(Board.NUM_COLUMNS)
+            next_step[column] = 1
+            next_steps.append(next_step)
         return next_steps
 
     # get all states except for the last
@@ -40,12 +53,18 @@ class Log:
     # get the next step after index
     def get_next_step(self, index):
         if index + 1 < self.length:
-            return self.state_matrices[index + 1] - self.state_matrices[index]
+            delta_state = self.state_matrices[index + 1] - self.state_matrices[index]
+            max_index = numpy.argmax(delta_state)
+            column = max_index % Board.NUM_COLUMNS
+            next_step = numpy.zeros(Board.NUM_COLUMNS)
+            next_step[column] = 1
+            return next_step
         else:
             return None
+
     # get all corresponding next steps to the steps get_all_states returns
     def get_all_next_steps(self):
         next_steps = []
         for i in range(0, self.length-1):
-            next_steps.append(self.state_matrices[i+1] - self.state_matrices[i])
+            next_steps.append(self.get_next_step(i))
         return np.array(next_steps)

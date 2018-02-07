@@ -1,16 +1,7 @@
 from enum import Enum
 
 from src.Board import Board
-
-
-class GameState(Enum):
-    OFFLINE = -1
-    RUNNING = 0
-    TRY_TO_SET = 1
-    SET_SUCCESSFUL = 2
-    WON_BY_PLAYER_1 = 3
-    WON_BY_PLAYER_2 = 4
-    REMIS = 5
+from src.GameState import GameState
 
 class Engine:
 
@@ -21,6 +12,7 @@ class Engine:
         self.state = GameState.OFFLINE
 
     def step(self, player_char, column):
+        processed = False
         game_state = GameState.TRY_TO_SET
         # Try to set
         for i in range(0, Board.NUM_ROWS):

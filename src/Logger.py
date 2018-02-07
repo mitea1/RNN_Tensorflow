@@ -8,3 +8,5 @@ class Logger:
 
     def get_log(self, index):
         return self.logs[index]
+    def clear(self):
+        self.logs.clear()

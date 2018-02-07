@@ -1,8 +1,11 @@
 import numpy as np
 
+from src.GameState import GameState
+
+
 class Board:
-    NUM_ROWS = 7
-    NUM_COLUMNS = 6
+    NUM_ROWS = 6
+    NUM_COLUMNS = 7
     X_OCCUPIED_CELL = [1, 0]
     O_OCCUPIED_CELL = [0, 1]
     EMPTY_CELL = [0, 0]
@@ -43,8 +46,13 @@ class Board:
 
     # define the state of a given cell
     def set_cell_state(self, row, column, state):
-        if row < self.rows and column < self.columns:
+        if row < self.rows and column < self.columns \
+                and self.board_matrix[row, column, 0] == 0 and self.board_matrix[row, column, 1] == 0:
             self.board_matrix[row, column] = state
+            return GameState.SET_SUCCESSFUL
+        else:
+            return GameState.TRY_TO_SET
+
 
     # find out if there are 4 connected on the board
     def are_4_connected(self):
