@@ -49,6 +49,7 @@ while number_of_Games > 0:
                 if USE_NN:
                     board_matrix_representation = eng.get_board().board_matrix.copy()
                     prediction = rnn.predict(board_matrix_representation)
+                    print(prediction)
                     max_index = numpy.argmax(prediction)
                     column = max_index % Board.NUM_COLUMNS
                 else:

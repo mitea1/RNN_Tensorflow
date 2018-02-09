@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/mitea/PycharmProjects/RNN_Tensorflow/src/data/session/my_test_model-1000"
+all_model_checkpoint_paths: "/home/mitea/PycharmProjects/RNN_Tensorflow/src/data/session/my_test_model-1000"

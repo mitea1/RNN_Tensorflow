@@ -121,15 +121,16 @@ class RNN_Model:
             rewards = 1 * np.ones(shape=[length, 1])
         elif winner_char == Board.O_OCCUPIED_CELL:
             rewards = 1 * np.ones(shape=[length, 1])
+            rewards[length-1] = -rewards[length-1]
         return rewards
 
     def train(self):
         self.sess.run(self.init)
         # Start training
         step_index = 0
-        epoch = 1
+        epoch = 2
         while epoch > 0:
-            log_length = 1000
+            log_length = 2000
             for log in self.logger.logs:
                 if log_length == 0:
                     break
@@ -141,7 +142,7 @@ class RNN_Model:
                 self.batch_size = 1
                 for i in range(0, self.batch_size):
                     batch_x, batch_y = log.get_state(i), log.get_next_step(i)
-                    #batch_x, batch_y, rewards = self.shuffle_batch(batch_x, batch_y, rewards)
+                    #batch_x, batch_y, rewards = self.shuffle_batch(batch_x, batch_y, rewards)#for stochastic gradient descent
                     batch_x = np.array(batch_x).reshape((self.batch_size, self.timesteps, self.num_input))
                     batch_y = np.array(batch_y).reshape((self.batch_size, self.num_classes))
                     reward = np.array(rewards[i]).reshape((self.batch_size))
@@ -177,8 +178,8 @@ class RNN_Model:
         self.saver.restore(self.sess, tf.train.latest_checkpoint(FILE_PATH_SESSION))
 
 
-model = RNN_Model()
-model.train()
+#model = RNN_Model()
+#model.train()
 #model.save()
 #model.load('my_test_model-1000')
 #print("Finished")
