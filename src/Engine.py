@@ -12,7 +12,6 @@ class Engine:
         self.state = GameState.OFFLINE
 
     def step(self, player_char, column):
-        processed = False
         game_state = GameState.TRY_TO_SET
         # Try to set
         for i in range(0, Board.NUM_ROWS):
@@ -28,6 +27,10 @@ class Engine:
                     self.board.set_cell_state(row, column, Board.O_OCCUPIED_CELL)
                     game_state = GameState.SET_SUCCESSFUL
                     break
+            # Player tried to set an occupied cell
+            else:
+                game_state = GameState.SET_FAIL
+
         self.board.convert_to_char_representation()
         are_4_connected, connected_char = self.board.are_4_connected()
         free_cells = (self.board.board_char_representation == '_').sum()

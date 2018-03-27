@@ -12,6 +12,7 @@ class Board:
     CHAR_EMPTY = '_'
     CHAR_PLAYER_A = 'x'
     CHAR_PLAYER_B = 'o'
+    LINE_LENGTH = 4
 
     def __init__(self, num_rows=NUM_ROWS, num_columns=NUM_COLUMNS):
         self.rows = num_rows
@@ -66,55 +67,55 @@ class Board:
                     checking_next_diagup_char = True
                     checking_next_row_char = True
 
-                    offset = 1
+                    line_length_count = 1
                     while(checking_next_column_char):
-                        if (column + offset) > (self.columns - 1):
+                        if (column + line_length_count) > (self.columns - 1):
                             checking_next_column_char = False
                         else:
-                            next_column_char = self.board_char_representation[row, column + offset]
+                            next_column_char = self.board_char_representation[row, column + line_length_count]
                             if next_column_char == actual_char:
-                                offset += 1
+                                line_length_count += 1
                             else:
                                 checking_next_column_char = False
-                            if offset == 4:
+                            if line_length_count == self.LINE_LENGTH:
                                 return True, actual_char
 
-                    offset = 1
+                    line_length_count = 1
                     while (checking_next_diagdown_char):
-                        if (column + offset > self.columns - 1) or (row + offset > self.rows - 1):
+                        if (column + line_length_count > self.columns - 1) or (row + line_length_count > self.rows - 1):
                             checking_next_diagdown_char = False
                         else:
-                            next_diagonal_char = self.board_char_representation[row + offset, column + offset]
+                            next_diagonal_char = self.board_char_representation[row + line_length_count, column + line_length_count]
                             if next_diagonal_char == actual_char:
-                                offset += 1
+                                line_length_count += 1
                             else:
                                 checking_next_diagdown_char = False
-                            if offset == 4:
+                            if line_length_count == self.LINE_LENGTH:
                                 return True, actual_char
 
-                    offset = 1
+                    line_length_count = 1
                     while (checking_next_diagup_char):
-                        if (column + offset > self.columns - 1) or (row - offset < 0):
+                        if (column + line_length_count > self.columns - 1) or (row - line_length_count < 0):
                             checking_next_diagup_char = False
                         else:
-                            next_diagonal_char = self.board_char_representation[row - offset, column + offset]
+                            next_diagonal_char = self.board_char_representation[row - line_length_count, column + line_length_count]
                             if next_diagonal_char == actual_char:
-                                offset += 1
+                                line_length_count += 1
                             else:
                                 checking_next_diagup_char = False
-                            if offset == 4:
+                            if line_length_count == self.LINE_LENGTH:
                                 return True, actual_char
 
-                    offset = 1
+                    line_length_count = 1
                     while (checking_next_row_char):
-                        if row + offset > self.rows - 1:
-                            checking_next_row_char = False
-                        else:
-                            next_row_char = self.board_char_representation[row+offset, column]
-                            if next_row_char == actual_char:
-                                offset += 1
-                            else:
-                                checking_next_row_char = False
-                            if offset == 4:
-                                return True, actual_char
+                       if row + line_length_count > self.rows - 1:
+                           checking_next_row_char = False
+                       else:
+                           next_row_char = self.board_char_representation[row+line_length_count, column]
+                           if next_row_char == actual_char:
+                               line_length_count += 1
+                           else:
+                               checking_next_row_char = False
+                           if line_length_count == 4:
+                               return True, actual_char
         return False, None
