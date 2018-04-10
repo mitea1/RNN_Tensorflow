@@ -12,7 +12,9 @@ LOCATION = os.getcwd()
 FILE_NAME_LOGGER = LOCATION + '/data/log/Basic_NN Tue Mar 20 20:51:50 2018.pkl'
 FILE_PATH_SESSION = LOCATION + '/data/session/'
 FILE_NAME_BIASES = LOCATION + '/data/model/rnn_biases.pkl'
-MODEL_NAME = 'LSTM_HIDDEN_1024_rand_vs_rand'
+MODEL_NAME = 'LSTM_1024_seq_to_seq_fb_1_0'
+LOGDIR = LOCATION + '/log/summaries'
+
 X_CELL_FILTER_CONV_1 = 4
 Y_CELL_FILTER_CONV_1 = 4
 NUM_FILTER_CONV_1_OUT = 20
@@ -77,6 +79,12 @@ class AI:
             self.correct_prediction = tf.equal(tf.argmax(self.prediction_rnn, 1), tf.argmax(self.Y_rnn, 1))
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
 
+            # Tensorboard stats
+            # tf.summary.histogram("weights", self.weights)
+            # tf.summary.histogram("biases", self.biases)
+            tf.summary.scalar("loss", self.loss_operation)
+            self.writer = tf.summary.FileWriter(LOGDIR)
+            self.merge_all_summaries = tf.summary.merge_all()
 
 
         # CNN
@@ -116,7 +124,7 @@ class AI:
 
         # Define a rnn cell with tensorflow
         #rnn_cell = rnn.BasicRNNCell(self.num_hidden)
-        rnn_cell = rnn.LSTMCell(self.num_hidden, activation=tf.nn.relu, forget_bias=0.5)
+        rnn_cell = rnn.LSTMCell(self.num_hidden, activation=tf.nn.softmax, forget_bias=1.0)
 
         # Get RNN cell output
         self.outputs, states = rnn.static_rnn(rnn_cell, x, sequence_length=[self.timesteps], dtype=tf.float32)
@@ -212,7 +220,7 @@ class AI:
     def predict_rnn(self, x_input):
         x = np.array(x_input)
         x = x_input.reshape(1, self.timesteps, self.num_input)
-        predicted = self. sess.run([self.prediction_rnn], feed_dict={self.X_rnn: x})
+        predicted = self.sess.run([self.prediction_rnn], feed_dict={self.X_rnn: x})
         #predicted = np.array(predicted).reshape(Board.NUM_COLUMNS)
         return predicted
 
@@ -232,7 +240,6 @@ class AI:
         return batch_x, batch_y, rewards
 
     # Getting rewards according to the winner. Winning: positive , Loosing: negative
-    # todo add padding
     def get_rewards(self, winner_char, length):
         if winner_char == Board.X_OCCUPIED_CELL:
             rewards = 1 * np.ones(shape=[length, 1])
@@ -240,7 +247,9 @@ class AI:
             rewards = -1 * np.ones(shape=[length, 1])
         elif winner_char == Board.EMPTY_CELL:
             rewards = -1 * np.ones(shape=[length, 1])
-            #rewards[length-1] = 2 * rewards[length-1]
+        # pad with zeros
+        rewards = np.append(rewards,np.zeros(shape=[21-length,1]))
+
 
         return rewards
 
@@ -291,13 +300,17 @@ class AI:
         batch_y = np.array(batch_y).reshape((self.batch_size, self.timesteps, self.num_input))
         rewards = self.get_rewards(log.winner_char, self.actual_game_actions)
         self.discount_rewards(rewards, 0.99)  # use 1 since a discrete number of steps result in an endstate
-        reward = np.array(rewards).reshape(self.actual_game_actions)
+        reward = rewards
         # Only train if next step is done by correct player
         # Run optimization op (backprop)
-        self.sess.run(self.train_operation,
+        _, summ = self.sess.run([self.train_operation,self.merge_all_summaries],
                       feed_dict={self.X_rnn: batch_x,
                                  self.Y_rnn: batch_y,
                                  self.Rewards: reward})
+        # update tensorboard log
+        self.writer.add_summary(summ, self.global_step)
+        self.writer.flush()
+
         if self.global_step % self.display_step == 0 or self.global_step == 1:
             # Calculate batch loss and accuracy
             loss, acc = self.sess.run([self.loss_operation, self.accuracy],
@@ -305,19 +318,18 @@ class AI:
             print("Step " + str(self.global_step) + ", Minibatch Loss= " + \
                   "{:.4f}".format(loss) + ", Training Accuracy= " + \
                   "{:.3f}".format(acc))
-            x = np.array(batch_x[0]).reshape(1, self.timesteps, self.num_input)
-            y = np.array(batch_y[0])
-            predicted = self.predict_rnn(x)
+            #x = np.array(batch_x[0]).reshape(1, self.timesteps, self.num_input)
+            #y = np.array(batch_y[0])
+            #predicted = self.predict_rnn(x)
             #print(predicted)
-            for prediction in predicted[0]:
-                print(np.argmax(prediction))
-            print(y)
-            print(np.argmax(y))
+            #for prediction in predicted[0]:
+            #    print(np.argmax(prediction))
+            #print(y)
+            #print(np.argmax(y))
 
     # Train network using a specific log
     def train(self, log):
         if log is None:
-            self.sess.run(self.init)
             # Start training
             epoch = 1
             while epoch > 0:
@@ -326,6 +338,15 @@ class AI:
                     epoch -= 1
                     self.global_step += 1
             print("Optimization Finished: " + str(epoch))
+        else:
+            # Start training
+            epoch = 1
+            while epoch > 0:
+                self._train(log)
+                epoch -= 1
+                self.global_step += 1
+            print("Optimization Finished: " + str(epoch))
+
 
     # Save the the actual session
     def save(self):
@@ -343,8 +364,8 @@ class AI:
         self.saver.restore(self.sess, tf.train.latest_checkpoint(FILE_PATH_SESSION))
 
 
-model = AI('rnn')
-model.train(log=None)
+#model = AI('rnn')
+#model.train(log=None)
 #model.save(model.global_step)
 #model.load('my_test_model-1000')
 #print("Finished")
