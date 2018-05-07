@@ -12,34 +12,36 @@ LOCATION = os.getcwd()
 FILE_NAME_LOGGER = LOCATION + '/data/log/Basic_NN Tue Mar 20 20:51:50 2018.pkl'
 FILE_PATH_SESSION = LOCATION + '/data/session/'
 FILE_NAME_BIASES = LOCATION + '/data/model/rnn_biases.pkl'
-MODEL_NAME = 'LSTM_1024_seq_to_seq_fb_1_0'
+MODEL_NAME = 'CNN'
 LOGDIR = LOCATION + '/log/summaries'
 
-X_CELL_FILTER_CONV_1 = 4
-Y_CELL_FILTER_CONV_1 = 4
-NUM_FILTER_CONV_1_OUT = 20
-X_CELL_FILTER_CONV_2 = 4
-Y_CELL_FILTER_CONV_2 = 4
+# Network parameters
+X_CELL_FILTER_CONV_1 = 3
+Y_CELL_FILTER_CONV_1 = 3
+NUM_FILTER_CONV_1_OUT = 10
+X_CELL_FILTER_CONV_2 = 2
+Y_CELL_FILTER_CONV_2 = 2
 NUM_FILTER_CONV_2_IN = NUM_FILTER_CONV_1_OUT
 NUM_FILTER_CONV_2_OUT = 20
 KEEP_PROP_DROPOUT = 0.8
-LEARNING_RATE = 0.001
-LEARNING_RATE_DECAY = 0.99
-NUM_HIDDEN = 1024
+LEARNING_RATE_RNN = 0.001
+LEARNING_RATE_DECAY_RNN = 0.99
+LEARNING_RATE_CNN = 0.001
+LEARNING_RATE_DECAY_CNN = 0.99
+NUM_HIDDEN = 1024 * 2
+EPOCHS = 5
 
 
 class AI:
 
     def __init__(self, network_type):
         # Load data
-        with open(FILE_NAME_LOGGER, 'rb') as f:
-            self.logger = pickle.load(f)
+        #with open(FILE_NAME_LOGGER, 'rb') as f:
+        #    self.logger = pickle.load(f)
 
         # Build RNN Graph
+        self.network_type = network_type
 
-        # Training Parameters
-        self.learning_rate = LEARNING_RATE
-        self.learning_rate_decay = LEARNING_RATE_DECAY
         self.training_steps = 2000
         self.batch_size = 1
         self.display_step = 10
@@ -54,10 +56,15 @@ class AI:
 
         # tf Graph input
         # RNN
-        if network_type == 'rnn':
+        if self.network_type == 'rnn':
+            # Training Parameters
+            self.learning_rate = LEARNING_RATE_RNN
+            self.learning_rate_decay = LEARNING_RATE_DECAY_RNN
+
             self.X_rnn = tf.placeholder("float", [None, self.timesteps, self.num_classes])  # Input of RNN
             self.Y_rnn = tf.placeholder("float", [None, self.timesteps, self.num_classes])  # Output of RNN
             self.Outputs = None
+
             # Define weights and biases
             self.weights = {
                 'out': tf.Variable(tf.random_normal([21,self.num_hidden, self.num_classes], mean=0, stddev=0.01))
@@ -88,17 +95,23 @@ class AI:
 
 
         # CNN
-        elif network_type == 'cnn':
+        elif self.network_type == 'cnn':
+            # Training Parameters
+            self.learning_rate = LEARNING_RATE_CNN
+            self.learning_rate_decay = LEARNING_RATE_DECAY_CNN
+
             self.X_cnn = tf.placeholder("float", [None, Board.NUM_ROWS, Board.NUM_COLUMNS, len(Board.EMPTY_CELL)])
             self.Y_cnn = tf.placeholder("float", [None, self.num_classes])
             self.logits_cnn = self.CNN()
-            self.prediction_cnn = tf.nn.sigmoid(self.logits_cnn)
+            self.prediction_cnn = tf.nn.softmax(self.logits_cnn)
+
             # Define loss and optimizer
             self.Rewards = tf.placeholder("float", shape=[None])  # Reward input to weight input
             self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=self.logits_cnn, labels=self.Y_cnn)
             self.loss_operation = tf.reduce_sum(self.Rewards * self.cross_entropy)
             self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate, decay=self.learning_rate_decay)
             self.train_operation = self.optimizer.minimize(self.loss_operation)
+
             # Evaluate model (with test logits, for dropout to be disabled)
             self.correct_prediction = tf.equal(tf.argmax(self.prediction_cnn, 1), tf.argmax(self.Y_cnn, 1))
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
@@ -124,7 +137,7 @@ class AI:
 
         # Define a rnn cell with tensorflow
         #rnn_cell = rnn.BasicRNNCell(self.num_hidden)
-        rnn_cell = rnn.LSTMCell(self.num_hidden, activation=tf.nn.softmax, forget_bias=1.0)
+        rnn_cell = rnn.LSTMCell(self.num_hidden, activation=tf.nn.softmax, forget_bias=1.0,use_peepholes=True)
 
         # Get RNN cell output
         self.outputs, states = rnn.static_rnn(rnn_cell, x, sequence_length=[self.timesteps], dtype=tf.float32)
@@ -136,12 +149,12 @@ class AI:
         return tf.matmul(full_1_drop, self.weights['out']) + self.biases['out']
 
     # Defines weight variable according to a shape
-    def weight_variable(self,shape):
+    def weight_variable(self, shape):
         initial = tf.truncated_normal(shape, stddev=0.1)
         return tf.Variable(initial)
 
     # Defines bias variable according to a shape
-    def bias_variable(self,shape):
+    def bias_variable(self, shape):
         initial = tf.constant(0.1, shape=shape)
         return tf.Variable(initial)
 
@@ -166,7 +179,7 @@ class AI:
             tf.summary.histogram("biases", biases)
             weights_reshaped = tf.reshape(weights, shape=[-1, shape[0], shape[1], 1], name='w_reshaped')
             tf.summary.image('filter', weights_reshaped, max_outputs=16)
-        return tf.nn.relu(self.conv2d(input_x, weights) + biases)
+        return tf.nn.softmax(self.conv2d(input_x, weights) + biases)
 
     def full_layer(self,input, size, name):
         with tf.name_scope(name):
@@ -175,32 +188,36 @@ class AI:
             biases = self.bias_variable([size])
             tf.summary.histogram("weights", weights)
             tf.summary.histogram("biases", biases)
-        return tf.matmul(input, weights) + biases
+        return tf.nn.softmax(tf.matmul(input, weights) + biases)
 
-    def CNN(self):
+    def CNN(self):# todo make them self
         # Image input
         x_input = tf.reshape(self.X_cnn, [-1, Board.NUM_ROWS, Board.NUM_COLUMNS, len(Board.EMPTY_CELL)])
         # filter_summary = tf.summary.image('imsum',x_image,max_outputs=2)
 
         # Convolution Layer 1
+        # (n+2p-f)/(stride)+1 = (6+0-3)/1+1 = 4
+        # (n+2p-f)/(stride)+1 = (7+0-3)/1+1 = 5
         conv_1 = self.conv_layer(x_input,
                             shape=[X_CELL_FILTER_CONV_1, Y_CELL_FILTER_CONV_1, 2,
                                    NUM_FILTER_CONV_1_OUT],
                             name='convolution_layer_1')
-        conv_1_pool = self.max_pool_2x2(conv_1, name='convolution_1_pool')
+        #conv_1_pool = self.max_pool_2x2(conv_1, name='convolution_1_pool')
 
         # Convolution Layer 2
-        conv_2 = self.conv_layer(conv_1_pool,
+        # (n+2p-f)/(stride)+1 = (4+0-2)/1+1 = 3
+        # (n+2p-f)/(stride)+1 = (5+0-2)/1+1 = 4
+        conv_2 = self.conv_layer(conv_1,
                             shape=[X_CELL_FILTER_CONV_2, Y_CELL_FILTER_CONV_2, NUM_FILTER_CONV_2_IN,
                                    NUM_FILTER_CONV_2_OUT],
                             name='convolution_layer_2')
         conv_2_pool = self.max_pool_2x2(conv_2, name='convolution_2_pool')
 
-        # Flatten layer
-        conv_2_flat = tf.reshape(conv_2_pool, [-1, 2*2*20])
+        conv_2_flat = tf.reshape(conv_2_pool, [-1, 3*4*NUM_FILTER_CONV_2_OUT])
 
-        full_1 = tf.nn.relu(self.full_layer(conv_2_flat, 1024, name='fully_layer_1'))
-        full_1_drop = tf.nn.dropout(full_1, keep_prob=0.7)
+        full_1 = self.full_layer(conv_2_flat, 1024, name='fully_layer_1')
+        #full_1 = tf.nn.relu(self.full_layer(conv_2_flat, 1024, name='fully_layer_1'))
+        full_1_drop = tf.nn.dropout(full_1, keep_prob=0.9)
 
         # Fully Connected outputlayer
         y_conv = self.full_layer(full_1_drop, self.num_classes, name='y_conv')
@@ -217,7 +234,7 @@ class AI:
         self.logger = logger
 
     # Predict next "winning" game state on the board matrix using RNN
-    def predict_rnn(self, x_input):
+    def _predict_rnn(self, x_input):
         x = np.array(x_input)
         x = x_input.reshape(1, self.timesteps, self.num_input)
         predicted = self.sess.run([self.prediction_rnn], feed_dict={self.X_rnn: x})
@@ -225,13 +242,19 @@ class AI:
         return predicted
 
     # Predict next "winning" game state on the board matrix using RNN
-    def predict_cnn(self, x_input):
-        x = np.array(x_input)
-        x = np.array(x).reshape(1, Board.NUM_ROWS,Board.NUM_COLUMNS, len(Board.EMPTY_CELL))
+    def _predict_cnn(self, x_input):
+        x = np.array(x_input).reshape(-1, Board.NUM_ROWS, Board.NUM_COLUMNS, len(Board.EMPTY_CELL))
         predicted = self.sess.run([self.prediction_cnn], feed_dict={self.X_cnn: x})
-        predicted = np.array(predicted).reshape(Board.NUM_COLUMNS)
+        predicted = np.array(predicted).reshape(-1, Board.NUM_COLUMNS)
         return predicted
 
+    def predict(self, x_input):
+        if self.network_type == 'rnn':
+            return self._predict_rnn(x_input)
+        elif self.network_type == 'cnn':
+            return self._predict_cnn(x_input)
+        else:
+            return None
     # Randomly shuffle data. Used for stochastic gradient descent
     def shuffle_batch(self,batch_x,batch_y,rewards):
         locked_data = list(zip(batch_x, batch_y, rewards))
@@ -247,51 +270,45 @@ class AI:
             rewards = -1 * np.ones(shape=[length, 1])
         elif winner_char == Board.EMPTY_CELL:
             rewards = -1 * np.ones(shape=[length, 1])
-        # pad with zeros
-        rewards = np.append(rewards,np.zeros(shape=[21-length,1]))
 
+        # pad with zeros for rnn network
+        if self.network_type == 'rnn':
+            rewards = np.append(rewards,np.zeros(shape=[21-length,1]))
 
         return rewards
 
-    def _train_cnn(self):
-        self.sess.run(self.init)
-        # Start training
-        step_index = 0
-        epoch = 1
-        while epoch > 0:
-            for log in self.logger.logs:
-                rewards = self.get_rewards(log.winner_char, log.length - 1)
-                self.discount_rewards(rewards, 0.99)  # use 1 since a discrete number of steps result in an endstate
-                self.batch_size = 1
-                for i in range(0, log.length-1):
-                    batch_x = log.get_state(i)
-                    batch_y, cell_type = log.get_next_step(i)
-                    batch_x = np.array(batch_x).reshape((self.batch_size, Board.NUM_ROWS, Board.NUM_COLUMNS, len(Board.EMPTY_CELL)))
-                    batch_y = np.array(batch_y).reshape((self.batch_size, self.num_classes))
-                    reward = np.array(rewards[i]).reshape((self.batch_size))
-                    # Only train if next step is done by correct player
-                    if cell_type == Board.X_OCCUPIED_CELL:
-                        # Run optimization op (backprop)
-                        self.sess.run(self.train_operation, feed_dict={self.X_cnn: batch_x, self.Y_cnn: batch_y, self.Rewards: reward})
-                        if step_index % self.display_step == 0 or step_index == 1:
-                            # Calculate batch loss and accuracy
-                            loss, acc = self.sess.run([self.loss_operation, self.accuracy],
-                                                      feed_dict={self.X_cnn: batch_x, self.Y_cnn: batch_y, self.Rewards: reward})
-                            print("Step " + str(step_index) + ", Minibatch Loss= " + \
-                                  "{:.4f}".format(loss) + ", Training Accuracy= " + \
-                                  "{:.3f}".format(acc))
-                            x = np.array(batch_x[0]).reshape(1, self.timesteps, self.num_input)
-                            y = np.array(batch_y[0])
-                            predicted = self.predict_cnn(x)
-                            print(predicted)
-                            print(np.argmax(predicted))
-                            print(y)
-                            print(np.argmax(y))
-                        step_index += 1
-            epoch -= 1
-        print("Optimization Finished: " + str(epoch))
+    def _train_cnn(self,log):
+        rewards = self.get_rewards(log.winner_char, log.length - 1)
+        self.discount_rewards(rewards, 0.99)  # use 1 since a discrete number of steps result in an endstate
+        self.batch_size = 1
+        for i in range(0, log.length-1):
+            batch_x = Log_Analyzer(log).get_all_states()[i]
+            batch_y, cell_type = Log_Analyzer(log).get_all_next_steps()[i]
+            batch_x = np.array(batch_x).reshape((self.batch_size, Board.NUM_ROWS, Board.NUM_COLUMNS, len(Board.EMPTY_CELL)))
+            batch_y = np.array(batch_y).reshape((self.batch_size, self.num_classes))
+            reward = np.array(rewards[i]).reshape((self.batch_size))
+            # Only train if next step is done by correct player
+            if cell_type == Board.X_OCCUPIED_CELL:
+                # Run optimization op (backprop)
+                self.sess.run(self.train_operation, feed_dict={self.X_cnn: batch_x, self.Y_cnn: batch_y, self.Rewards: reward})
+                if self.global_step % self.display_step == 0 or self.global_step == 1:
+                    # Calculate batch loss and accuracy
+                    loss, acc = self.sess.run([self.loss_operation, self.accuracy],
+                                              feed_dict={self.X_cnn: batch_x, self.Y_cnn: batch_y, self.Rewards: reward})
+                    print("Step " + str(self.global_step) + ", Minibatch Loss= " + \
+                          "{:.4f}".format(loss) + ", Training Accuracy= " + \
+                          "{:.3f}".format(acc))
+                    #x = np.array(batch_x[0]).reshape(1, self.timesteps, self.num_input)
+                    #y = np.array(batch_y[0])
+                    #predicted = self._predict_cnn(x)
+                    #print(predicted)
+                    #print(np.argmax(predicted))
+                    #print(y)
+                    #print(np.argmax(y))
 
-    def _train(self, log):
+
+
+    def _train_rnn(self, log):
         self.batch_size = 1
         batch_x = Log_Analyzer(log).get_all_actions(padding=True)[0:-1:2]  #  player one -> every second action
         batch_y = Log_Analyzer(log).get_all_actions(padding=True)[1::2] #  player second -> every second action
@@ -318,33 +335,37 @@ class AI:
             print("Step " + str(self.global_step) + ", Minibatch Loss= " + \
                   "{:.4f}".format(loss) + ", Training Accuracy= " + \
                   "{:.3f}".format(acc))
-            #x = np.array(batch_x[0]).reshape(1, self.timesteps, self.num_input)
-            #y = np.array(batch_y[0])
-            #predicted = self.predict_rnn(x)
-            #print(predicted)
-            #for prediction in predicted[0]:
-            #    print(np.argmax(prediction))
-            #print(y)
-            #print(np.argmax(y))
+
 
     # Train network using a specific log
     def train(self, log):
         if log is None:
             # Start training
-            epoch = 1
+            epoch = EPOCHS
             while epoch > 0:
-                for log in self.logger.logs:
-                    self._train(log)
-                    epoch -= 1
-                    self.global_step += 1
-            print("Optimization Finished: " + str(epoch))
+                if self.network_type == 'rnn':
+                    for log in self.logger.logs:
+                        self._train_rnn(log)
+                        epoch -= 1
+                        self.global_step += 1
+                elif self.network_type == 'cnn':
+                    for log in self.logger.logs:
+                        self._train_cnn(log)
+                        epoch -= 1
+                        self.global_step += 1
+                print("Optimization Finished: " + str(epoch))
         else:
             # Start training
             epoch = 1
             while epoch > 0:
-                self._train(log)
-                epoch -= 1
-                self.global_step += 1
+                if self.network_type == 'rnn':
+                    self._train_rnn(log)
+                    epoch -= 1
+                    self.global_step += 1
+                elif self.network_type == 'cnn':
+                    self._train_cnn(log)
+                    epoch -= 1
+                    self.global_step += 1
             print("Optimization Finished: " + str(epoch))
 
 

@@ -10,6 +10,8 @@ class Log:
         self.states = []
         self.length = 0
         self.winner_char = ''
+        self.winning_rate_a = 0
+        self.winning_rate_b = 0
 
     # while logging
     # add a matrix representation of a state
@@ -36,3 +38,10 @@ class Log:
     def get_states(self, start_index, end_index):
         if end_index < self.length:
             return self.states[start_index:end_index]
+
+    # sets the actual winning rate of a player at the moment the log was saved
+    def set_winning_rate(self,player,rate):
+        if player == 'a':
+            self.winning_rate_a = rate
+        elif player == 'b':
+            self.winning_rate_b = rate
